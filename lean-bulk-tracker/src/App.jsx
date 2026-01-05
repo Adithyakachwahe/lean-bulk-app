@@ -1,26 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Activity, Utensils, Dumbbell, Moon,
-  PlusCircle, Calendar, Search, Database, Trash2, ChevronUp, ChevronDown, Menu
-} from 'lucide-react';
-import * as api from './api';
+import React, { useState, useEffect } from "react";
+import {
+  Activity,
+  Utensils,
+  Dumbbell,
+  Moon,
+  PlusCircle,
+  Calendar,
+  Search,
+  Database,
+  Trash2,
+  ChevronUp,
+} from "lucide-react";
+import * as api from "./api";
+
+/* =================== APP =================== */
 
 const App = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [loading, setLoading] = useState(true);
   const [planData, setPlanData] = useState(null);
+  const [error, setError] = useState(null);
 
   const refreshPlan = async () => {
     try {
-      const { data } = await api.fetchPlan();
-      if(!data || !data.workouts) {
-          await api.seedDB();
-          const seeded = await api.fetchPlan();
-          setPlanData(seeded.data);
+      setError(null);
+      const res = await api.fetchPlan();
+
+      if (!res.data || !res.data.workouts) {
+        await api.seedDB();
+        const seeded = await api.fetchPlan();
+        setPlanData(seeded.data);
       } else {
-          setPlanData(data);
+        setPlanData(res.data);
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      setError("Backend not reachable. Please refresh.");
+    }
   };
 
   useEffect(() => {
@@ -31,49 +47,69 @@ const App = () => {
     init();
   }, []);
 
-  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        Loading...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-red-400">
+        {error}
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans pb-24">
-      {/* Navigation - Optimized for Mobile Scrolling */}
-      <nav className="sticky top-0 z-50 bg-slate-800/95 backdrop-blur border-b border-slate-700 shadow-xl">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center justify-between">
-            <div className="p-3 md:p-4 text-center md:text-left bg-slate-900 md:bg-transparent">
-              <span className="text-lg font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                LeanBulk OS
-              </span>
-            </div>
-            {/* Scrollable Horizontal Nav */}
-            <div className="flex w-full overflow-x-auto no-scrollbar px-2 pb-2 md:pb-0 md:justify-end gap-1">
-              <NavBtn icon={<Activity size={18}/>} label="Stats" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-              <NavBtn icon={<Calendar size={18}/>} label="Tracker" active={activeTab === 'tracker'} onClick={() => setActiveTab('tracker')} />
-              <NavBtn icon={<Utensils size={18}/>} label="Diet" active={activeTab === 'nutrition'} onClick={() => setActiveTab('nutrition')} />
-              <NavBtn icon={<Dumbbell size={18}/>} label="Plan" active={activeTab === 'training'} onClick={() => setActiveTab('training')} />
-              <NavBtn icon={<Moon size={18}/>} label="Recover" active={activeTab === 'recovery'} onClick={() => setActiveTab('recovery')} />
-              <NavBtn icon={<Database size={18}/>} label="Foods" active={activeTab === 'library'} onClick={() => setActiveTab('library')} />
-            </div>
+    <div className="min-h-screen bg-slate-900 text-slate-100 pb-24">
+      {/* NAVBAR */}
+      <nav className="sticky top-0 z-50 bg-slate-800 border-b border-slate-700">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between">
+          <div className="p-4 text-center md:text-left">
+            <span className="text-lg font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+              LeanBulk OS
+            </span>
+          </div>
+
+          <div className="flex overflow-x-auto px-2 pb-2 gap-1">
+            <NavBtn label="Stats" icon={<Activity size={18} />} active={activeTab==="dashboard"} onClick={()=>setActiveTab("dashboard")} />
+            <NavBtn label="Tracker" icon={<Calendar size={18} />} active={activeTab==="tracker"} onClick={()=>setActiveTab("tracker")} />
+            <NavBtn label="Diet" icon={<Utensils size={18} />} active={activeTab==="nutrition"} onClick={()=>setActiveTab("nutrition")} />
+            <NavBtn label="Plan" icon={<Dumbbell size={18} />} active={activeTab==="training"} onClick={()=>setActiveTab("training")} />
+            <NavBtn label="Recover" icon={<Moon size={18} />} active={activeTab==="recovery"} onClick={()=>setActiveTab("recovery")} />
+            <NavBtn label="Foods" icon={<Database size={18} />} active={activeTab==="library"} onClick={()=>setActiveTab("library")} />
           </div>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-3 md:px-4 pt-4 md:pt-6">
-        {activeTab === 'dashboard' && planData && <DashboardSection data={planData} />}
-        {activeTab === 'training' && planData && <TrainingSection workouts={planData.workouts} onUpdate={refreshPlan} />}
-        {activeTab === 'nutrition' && planData && <NutritionSection diet={planData.nutrition} />}
-        {activeTab === 'recovery' && planData && <RecoverySection items={planData.recovery} />}
-        {activeTab === 'tracker' && <TrackerSection />}
-        {activeTab === 'library' && <FoodLibrarySection />}
+      <main className="max-w-6xl mx-auto px-3 pt-6">
+        {activeTab === "dashboard" && planData && <DashboardSection data={planData} />}
+        {activeTab === "training" && planData && (
+          <TrainingSection workouts={planData.workouts} onUpdate={refreshPlan} />
+        )}
+        {activeTab === "nutrition" && planData && (
+          <NutritionSection diet={planData.nutrition} />
+        )}
+        {activeTab === "recovery" && planData && (
+          <RecoverySection items={planData.recovery} />
+        )}
+        {activeTab === "tracker" && <TrackerSection />}
+        {activeTab === "library" && <FoodLibrarySection />}
       </main>
     </div>
   );
 };
 
+/* =================== UI HELPERS =================== */
+
 const NavBtn = ({ icon, label, active, onClick }) => (
-  <button 
+  <button
     onClick={onClick}
-    className={`flex-shrink-0 flex items-center space-x-2 px-4 py-2.5 rounded-lg transition-all text-sm font-medium whitespace-nowrap ${
-      active ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800'
+    className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap ${
+      active ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-800"
     }`}
   >
     {icon}
