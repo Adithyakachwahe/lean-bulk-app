@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // REPLACE THIS URL with the one you got from Render in Phase 3
 // It must end with /api
-const API_URL = 'https://lean-bulk-api.onrender.com/api'; 
+const API_URL = 'https://lean-bulk-app.onrender.com/api'; 
 
 export const fetchPlan = () => axios.get(`${API_URL}/plan`);
 export const seedDB = () => axios.post(`${API_URL}/seed`);
