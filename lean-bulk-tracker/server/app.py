@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from pymongo import MongoClient
 from bson import ObjectId
@@ -11,48 +11,63 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# 1. Basic CORS setup
-CORS(app, resources={r"/*": {"origins": "*"}})
-
-# 2. "Nuclear" Manual Header Injection
-# This ensures CORS headers are sent even if there is an error
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
+# Basic CORS as backup
+CORS(app)
 
 mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/leanbulkdb')
 client = MongoClient(mongo_uri)
 db = client.leanbulkdb
 
+# --- HELPER: Manually Add Headers ---
+def build_cors_response(data, code=200):
+    response = jsonify(data)
+    response.status_code = code
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, DELETE'
+    return response
+
+# --- ERROR HANDLER: Catch Crashes & Add Headers ---
+# This is crucial. If DB fails, this lets the error pass through to frontend.
+@app.errorhandler(Exception)
+def handle_exception(e):
+    return build_cors_response({"error": str(e), "type": "Internal Server Error"}, 500)
+
 # --- ROUTES ---
 
 @app.route('/', methods=['GET'])
 def home():
-    return "Backend is Live!"
+    return "Backend is Live"
 
-@app.route('/api/seed', methods=['POST'])
+@app.route('/api/seed', methods=['POST', 'OPTIONS'])
 def seed_database():
+    if request.method == 'OPTIONS': return build_cors_response({})
+    
     db.profile.delete_many({})
     db.foods.delete_many({})
     db.profile.insert_one(initial_plan)
     db.foods.insert_many(initial_foods)
-    return jsonify({"message": "Database seeded!"})
+    return build_cors_response({"message": "Database seeded!"})
 
-@app.route('/api/plan', methods=['GET'])
+@app.route('/api/plan', methods=['GET', 'OPTIONS'])
 def get_plan():
-    plan = db.profile.find_one({}, {'_id': 0})
-    if not plan:
-        # Auto-seed if empty
-        db.profile.insert_one(initial_plan)
-        db.foods.insert_many(initial_foods)
-        plan = db.profile.find_one({}, {'_id': 0})
-    return jsonify(plan)
+    if request.method == 'OPTIONS': return build_cors_response({})
 
-@app.route('/api/plan/add_exercise', methods=['POST'])
+    try:
+        plan = db.profile.find_one({}, {'_id': 0})
+        if not plan:
+            # Auto-seed attempt
+            db.profile.insert_one(initial_plan)
+            db.foods.insert_many(initial_foods)
+            plan = db.profile.find_one({}, {'_id': 0})
+        return build_cors_response(plan)
+    except Exception as e:
+        return build_cors_response({"error": "Database Error", "details": str(e)}, 500)
+
+@app.route('/api/plan/add_exercise', methods=['POST', 'OPTIONS'])
 def add_exercise():
+    if request.method == 'OPTIONS': return build_cors_response({})
+    
     data = request.json
     day = data.get('day')
     exercise = data.get('exercise')
@@ -60,10 +75,12 @@ def add_exercise():
         {"workouts.day": day},
         {"$push": {"workouts.$.exercises": exercise}}
     )
-    return jsonify({"message": "Exercise added"})
+    return build_cors_response({"message": "Exercise added"})
 
-@app.route('/api/plan/delete_exercise', methods=['POST'])
+@app.route('/api/plan/delete_exercise', methods=['POST', 'OPTIONS'])
 def delete_exercise():
+    if request.method == 'OPTIONS': return build_cors_response({})
+
     data = request.json
     day = data.get('day')
     ex_name = data.get('exerciseName')
@@ -71,41 +88,47 @@ def delete_exercise():
         {"workouts.day": day},
         {"$pull": {"workouts.$.exercises": {"name": ex_name}}}
     )
-    return jsonify({"message": "Exercise deleted"})
+    return build_cors_response({"message": "Exercise deleted"})
 
-@app.route('/api/foods', methods=['GET', 'POST'])
+@app.route('/api/foods', methods=['GET', 'POST', 'OPTIONS'])
 def manage_foods():
+    if request.method == 'OPTIONS': return build_cors_response({})
+
     if request.method == 'GET':
         foods = []
         for f in db.foods.find({}):
             f['_id'] = str(f['_id'])
             foods.append(f)
-        return jsonify(foods)
+        return build_cors_response(foods)
     
     if request.method == 'POST':
         new_food = request.json
         if db.foods.find_one({"name": new_food['name']}):
-            return jsonify({"error": "Food already exists"}), 400
+            return build_cors_response({"error": "Food already exists"}, 400)
         db.foods.insert_one(new_food)
-        return jsonify({"message": "Food added"})
+        return build_cors_response({"message": "Food added"})
 
-@app.route('/api/foods/delete', methods=['POST'])
+@app.route('/api/foods/delete', methods=['POST', 'OPTIONS'])
 def delete_food():
+    if request.method == 'OPTIONS': return build_cors_response({})
+    
     food_id = request.json.get('id')
     try:
         db.foods.delete_one({"_id": ObjectId(food_id)})
-        return jsonify({"message": "Food deleted"})
+        return build_cors_response({"message": "Food deleted"})
     except:
-        return jsonify({"error": "Invalid ID"}), 400
+        return build_cors_response({"error": "Invalid ID"}, 400)
 
-@app.route('/api/log', methods=['GET', 'POST'])
+@app.route('/api/log', methods=['GET', 'POST', 'OPTIONS'])
 def daily_log():
+    if request.method == 'OPTIONS': return build_cors_response({})
+    
     today = datetime.now().strftime('%Y-%m-%d')
     if request.method == 'GET':
         log = db.daily_logs.find_one({"date": today}, {'_id': 0})
         if not log:
-            return jsonify({"date": today, "items": [], "total_calories": 0, "total_protein": 0})
-        return jsonify(log)
+            return build_cors_response({"date": today, "items": [], "total_calories": 0, "total_protein": 0})
+        return build_cors_response(log)
 
     if request.method == 'POST':
         data = request.json
@@ -120,10 +143,12 @@ def daily_log():
             },
             upsert=True
         )
-        return jsonify({"message": "Logged successfully"})
+        return build_cors_response({"message": "Logged successfully"})
 
-@app.route('/api/log/delete', methods=['POST'])
+@app.route('/api/log/delete', methods=['POST', 'OPTIONS'])
 def delete_log_item():
+    if request.method == 'OPTIONS': return build_cors_response({})
+
     today = datetime.now().strftime('%Y-%m-%d')
     index = request.json.get('index')
     log = db.daily_logs.find_one({"date": today})
@@ -141,8 +166,8 @@ def delete_log_item():
                 }
             }
         )
-        return jsonify({"message": "Item deleted"})
-    return jsonify({"error": "Item not found"}), 400
+        return build_cors_response({"message": "Item deleted"})
+    return build_cors_response({"error": "Item not found"}, 400)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
