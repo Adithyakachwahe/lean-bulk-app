@@ -17,3 +17,5 @@ export const deleteFood = (id) => axios.post(`${API_URL}/foods/delete`, { id });
 export const fetchDailyLog = () => axios.get(`${API_URL}/log`);
 export const addToLog = (item) => axios.post(`${API_URL}/log`, { item });
 export const deleteFromLog = (index) => axios.post(`${API_URL}/log/delete`, { index });
+
+// Force update v2
