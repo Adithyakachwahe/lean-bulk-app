@@ -12,9 +12,6 @@ import os
 load_dotenv()
 app = Flask(__name__)
 
-# ------------------------
-# ✅ CORS (THIS IS THE KEY FIX)
-# ------------------------
 CORS(
     app,
     resources={r"/api/*": {"origins": "https://lean-bulk-app-tracker.vercel.app"}},
@@ -44,6 +41,61 @@ def get_plan():
         return jsonify({"message": "No plan found"}), 404
     return jsonify(plan)
 
+
+@app.route("/api/plan/add_exercise", methods=["POST"])
+def add_exercise():
+    data = request.json
+    day = data.get("day")
+    exercise = data.get("exercise")
+
+    if not day or not exercise or not exercise.get("name"):
+        return jsonify({"error": "Invalid data"}), 400
+
+    result = db.profile.update_one(
+        {
+            "workouts.day": day
+        },
+        {
+            "$push": {
+                "workouts.$.exercises": exercise
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        return jsonify({"error": "Workout day not found"}), 404
+
+    return jsonify({"message": "Exercise added successfully"}), 200
+
+
+@app.route("/api/plan/delete_exercise", methods=["POST"])
+def delete_exercise():
+    data = request.json
+    day = data.get("day")
+    exercise_name = data.get("exerciseName")
+
+    if not day or not exercise_name:
+        return jsonify({"error": "Invalid data"}), 400
+
+    result = db.profile.update_one(
+        {
+            "workouts.day": day
+        },
+        {
+            "$pull": {
+                "workouts.$.exercises": {
+                    "name": exercise_name
+                }
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        return jsonify({"error": "Workout day not found"}), 404
+
+    return jsonify({"message": "Exercise removed successfully"}), 200
+
+
 # ---------- FOODS ----------
 @app.route("/api/foods", methods=["GET", "POST"])
 def foods():
@@ -65,6 +117,7 @@ def foods():
         db.foods.insert_one(data)
         return jsonify({"message": "Food added"}), 201
 
+
 @app.route("/api/foods/delete", methods=["POST"])
 def delete_food():
     food_id = request.json.get("id")
@@ -73,6 +126,7 @@ def delete_food():
         return jsonify({"message": "Food deleted"})
     except:
         return jsonify({"error": "Invalid ID"}), 400
+
 
 # ---------- DAILY LOG ----------
 @app.route("/api/log", methods=["GET", "POST"])
@@ -112,6 +166,7 @@ def daily_log():
 
         return jsonify({"message": "Logged successfully"})
 
+
 @app.route("/api/log/delete", methods=["POST"])
 def delete_log():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -137,10 +192,9 @@ def delete_log():
 
     return jsonify({"message": "Item deleted"})
 
+
 # ------------------------
-# ENTRY POINT (LOCAL ONLY)
+# ENTRY POINT
 # ------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-# updated again
