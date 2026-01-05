@@ -10,7 +10,8 @@ from seed_data import initial_plan, initial_foods
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# Allow specific origins or * for all
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/leanbulkdb')
 client = MongoClient(mongo_uri)
