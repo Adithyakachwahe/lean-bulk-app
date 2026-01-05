@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  @apply bg-gray-50 text-gray-800;
+}
+
+h1, h2, h3, h4 {
+  @apply font-bold;
+}
+
+.section {
+  @apply mb-12;
+}
