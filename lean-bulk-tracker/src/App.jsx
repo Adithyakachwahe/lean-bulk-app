@@ -16,7 +16,8 @@ import {
   X,
   Droplets,
   Scale,
-  Flame
+  Flame,
+  AlertCircle
 } from "lucide-react";
 import * as api from "./api";
 
@@ -65,7 +66,6 @@ const App = () => {
     setDailyLog(res.data);
   };
 
-  // Allow updating profile (e.g., after logging weight)
   const refreshPlan = async () => {
       const res = await api.fetchPlan();
       setPlanData(res.data);
@@ -170,7 +170,6 @@ const DashboardSection = ({ data, dailyLog, onUpdateLog, onUpdatePlan }) => {
 
     return (
         <div className="space-y-6">
-            {/* Top Row Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 <StatCard label="Current Weight" value={`${data.profile.currentWeight} kg`} icon={<Scale size={16} className="text-slate-400"/>} />
                 <StatCard label="Target Weight" value={`${data.profile.targetWeight} kg`} color="text-blue-400" />
@@ -178,7 +177,6 @@ const DashboardSection = ({ data, dailyLog, onUpdateLog, onUpdatePlan }) => {
                 <StatCard label="Protein Left" value={`${Math.max(0, protRemaining).toFixed(1)} g`} color={protRemaining <= 0 ? "text-emerald-400" : "text-orange-400"} sub={protRemaining <= 0 ? "Goal Hit!" : "To Go"}/>
             </div>
 
-            {/* Quick Actions & Weight Log */}
             <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
                  <div className="flex items-center gap-3">
                     <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400">
@@ -244,11 +242,8 @@ const DashboardSection = ({ data, dailyLog, onUpdateLog, onUpdatePlan }) => {
 const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
     const [foods, setFoods] = useState([]);
     const [search, setSearch] = useState("");
-    
-    // Quantity Modal
     const [selectedFood, setSelectedFood] = useState(null);
     const [quantity, setQuantity] = useState(1);
-
     const targetProt = 180;
 
     useEffect(() => { 
@@ -262,8 +257,6 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
 
     const confirmAdd = async () => {
         if (!selectedFood) return;
-        
-        // SAFE NUMBER CONVERSION
         const totalCalories = Math.round(Number(selectedFood.calories) * quantity);
         const totalProtein = Number((Number(selectedFood.protein) * quantity).toFixed(1));
         const totalCarbs = Number(((Number(selectedFood.carbs) || 0) * quantity).toFixed(1));
@@ -299,7 +292,6 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
 
     return (
         <div className="space-y-6 relative">
-            {/* QUANTITY MODAL */}
             {selectedFood && (
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl relative">
@@ -324,7 +316,6 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                 </div>
             )}
 
-            {/* PROGRESS BARS & REMAINING */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 relative overflow-hidden flex justify-between items-center">
                     <div className="z-10 relative">
@@ -353,9 +344,7 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                 </div>
             </div>
 
-            {/* MACROS & WATER ROW */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* Water Widget */}
                 <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30 md:col-span-1">
                     <div className="flex justify-between items-start mb-2">
                         <h3 className="text-blue-400 text-xs font-bold uppercase flex items-center gap-2"><Droplets size={14}/> Hydration</h3>
@@ -367,7 +356,6 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                     </div>
                 </div>
 
-                {/* Macro Breakdown */}
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 md:col-span-2 flex justify-around items-center">
                     <div className="text-center">
                         <div className="text-xs text-slate-500 uppercase mb-1">Carbs</div>
@@ -386,7 +374,6 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                 </div>
             </div>
 
-            {/* Search */}
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm relative z-20">
                 <div className="relative">
                     <Search className="absolute left-3 top-3.5 text-slate-500 w-4 h-4" />
@@ -415,7 +402,6 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                 )}
             </div>
 
-            {/* Today's List */}
             <div className="bg-slate-800 rounded-xl border border-slate-700 min-h-[300px]">
                  <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
                     <h3 className="font-bold text-sm uppercase text-slate-400 tracking-wider">Today's Intake</h3>
@@ -429,7 +415,7 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                  ) : (
                      <div className="divide-y divide-slate-700/50">
                          {dailyLog.items.map((item, idx) => (
-                             <div key={idx} className="flex justify-between items-center p-4 hover:bg-slate-700/10 transition">
+                             <div key={idx} className="flex justify-between items-center p-4 hover:bg-slate-700/10 transition group">
                                  <div>
                                      <div className="font-medium text-sm text-slate-200">{item.name}</div>
                                      <div className="text-xs text-slate-500 flex space-x-3 mt-0.5 font-mono">
@@ -439,8 +425,9 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                                          <span className="text-slate-500">{Number(item.fat || 0).toFixed(1)}g F</span>
                                      </div>
                                  </div>
-                                 <button onClick={() => handleDelete(idx)} className="text-slate-600 hover:text-red-400 p-2 transition">
-                                     <Trash2 size={16} />
+                                 {/* MODIFIED: Visible on mobile, hover on desktop */}
+                                 <button onClick={() => handleDelete(idx)} className="text-slate-500 hover:text-red-400 p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                     <Trash2 size={18} />
                                  </button>
                              </div>
                          ))}
@@ -451,7 +438,7 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
     );
 };
 
-// --- TRAINING ---
+// --- TRAINING SECTION (UPDATED) ---
 const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
     const [addingToDay, setAddingToDay] = useState(null);
     const [newEx, setNewEx] = useState({ name: '', sets: 3, reps: '10-12', rest: '60s' });
@@ -471,7 +458,8 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
     };
 
     const handleDelete = async (day, exName) => {
-        if(window.confirm(`Remove ${exName} from plan?`)) {
+        // Simple confirmation before deleting
+        if(window.confirm(`Are you sure you want to remove "${exName}" from the ${day} workout?`)) {
             await api.deleteExerciseFromPlan(day, exName);
             onUpdatePlan();
         }
@@ -481,52 +469,69 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
         <div className="space-y-4">
             {workouts && workouts.map((day, i) => (
                 <div key={i} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm">
+                    {/* Header */}
                     <div className="p-4 flex justify-between items-center bg-gradient-to-r from-slate-800 to-slate-800/50 border-b border-slate-700">
                         <div>
                             <h3 className="text-blue-400 font-bold text-lg">{day.day}</h3>
                             <p className="text-xs text-slate-400 uppercase tracking-wide">{day.title}</p>
                         </div>
-                        <button onClick={() => setAddingToDay(addingToDay === day.day ? null : day.day)} className="bg-slate-700 p-2 rounded-full hover:bg-slate-600 transition">
+                        <button 
+                            onClick={() => setAddingToDay(addingToDay === day.day ? null : day.day)} 
+                            className="bg-slate-700 p-2 rounded-full hover:bg-slate-600 transition"
+                        >
                             {addingToDay === day.day ? <ChevronUp size={20}/> : <PlusCircle size={20}/>}
                         </button>
                     </div>
 
+                    {/* Add Exercise Form (Responsive) */}
                     {addingToDay === day.day && (
                         <div className="p-4 bg-slate-900 border-b border-slate-700 animate-in fade-in slide-in-from-top-2">
                             <h4 className="text-xs uppercase text-emerald-400 mb-3 font-bold">Add New Exercise</h4>
                             <div className="grid grid-cols-1 gap-3 mb-3">
-                                <input placeholder="Name (e.g. Bench Press)" className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none" value={newEx.name} onChange={e=>setNewEx({...newEx, name: e.target.value})} />
+                                <input 
+                                    placeholder="Name (e.g. Bench Press)" 
+                                    className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none" 
+                                    value={newEx.name} 
+                                    onChange={e=>setNewEx({...newEx, name: e.target.value})} 
+                                />
                                 <div className="grid grid-cols-3 gap-2">
-                                    <input placeholder="Sets" type="number" className="bg-slate-800 p-3 rounded text-sm border border-slate-700 outline-none" value={newEx.sets} onChange={e=>setNewEx({...newEx, sets: e.target.value})} />
-                                    <input placeholder="Reps" className="bg-slate-800 p-3 rounded text-sm border border-slate-700 outline-none" value={newEx.reps} onChange={e=>setNewEx({...newEx, reps: e.target.value})} />
-                                    <input placeholder="Rest" className="bg-slate-800 p-3 rounded text-sm border border-slate-700 outline-none" value={newEx.rest} onChange={e=>setNewEx({...newEx, rest: e.target.value})} />
+                                    <input placeholder="Sets" type="number" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.sets} onChange={e=>setNewEx({...newEx, sets: e.target.value})} />
+                                    <input placeholder="Reps" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.reps} onChange={e=>setNewEx({...newEx, reps: e.target.value})} />
+                                    <input placeholder="Rest" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.rest} onChange={e=>setNewEx({...newEx, rest: e.target.value})} />
                                 </div>
                             </div>
                             <button onClick={() => handleAdd(day.day)} className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg text-sm font-bold transition">Add to Workout</button>
                         </div>
                     )}
 
+                    {/* Exercise List */}
                     <div className="divide-y divide-slate-700/50">
                         {day.exercises.map((ex, j) => {
                             const isDone = completedSet.has(ex.name);
                             return (
-                                <div key={j} className={`p-4 flex justify-between items-center transition-all duration-300 ${isDone ? 'bg-emerald-900/10' : 'hover:bg-slate-700/20'}`}>
-                                    <div className="flex items-center gap-4">
-                                        <button onClick={() => handleToggleComplete(ex.name, day.day)} className={`p-2 rounded-full border-2 transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-transparent hover:border-emerald-500'}`}>
+                                <div key={j} className={`p-4 flex justify-between items-center transition-all duration-300 group ${isDone ? 'bg-emerald-900/10' : 'hover:bg-slate-700/20'}`}>
+                                    <div className="flex items-center gap-4 overflow-hidden">
+                                        <button onClick={() => handleToggleComplete(ex.name, day.day)} className={`flex-shrink-0 p-2 rounded-full border-2 transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-transparent hover:border-emerald-500'}`}>
                                             <CheckCircle size={18} fill={isDone ? "currentColor" : "none"} />
                                         </button>
-                                        <div className={isDone ? "opacity-50" : "opacity-100"}>
-                                            <div className={`font-medium text-slate-200 ${isDone ? 'line-through decoration-slate-500' : ''}`}>{ex.name}</div>
-                                            <div className="text-xs text-slate-500 mt-1 flex gap-3">
-                                                <span className="bg-slate-700 px-1.5 rounded text-slate-300">{ex.sets} sets</span>
-                                                <span className="bg-slate-700 px-1.5 rounded text-slate-300">{ex.reps}</span>
-                                                <span className="flex items-center gap-1"><Clock size={10}/> {ex.rest}</span>
+                                        <div className={`min-w-0 ${isDone ? "opacity-50" : "opacity-100"}`}>
+                                            <div className={`font-medium text-slate-200 truncate ${isDone ? 'line-through decoration-slate-500' : ''}`}>{ex.name}</div>
+                                            <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.sets} sets</span>
+                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.reps}</span>
+                                                <span className="flex items-center gap-1 whitespace-nowrap"><Clock size={10}/> {ex.rest}</span>
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    {/* DELETE BUTTON: Always visible on mobile (opacity-100), hidden on desktop until hover (md:opacity-0) */}
                                     {!isDone && (
-                                        <button onClick={() => handleDelete(day.day, ex.name)} className="text-slate-600 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition">
-                                            <Trash2 size={16} />
+                                        <button 
+                                            onClick={() => handleDelete(day.day, ex.name)} 
+                                            className="ml-2 text-slate-500 hover:text-red-400 p-2 md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity"
+                                            title="Remove Exercise"
+                                        >
+                                            <Trash2 size={18} />
                                         </button>
                                     )}
                                 </div>
