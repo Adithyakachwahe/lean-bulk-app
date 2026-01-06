@@ -1,11 +1,8 @@
 import axios from "axios";
 
-/**
- * Backend base URL (Render)
- * MUST point to backend service
- */
+// CHANGE THIS TO YOUR ACTUAL BACKEND URL IF DIFFERENT
 const API = axios.create({
-  baseURL: "https://lean-bulk-app.onrender.com/api",
+  baseURL: "http://127.0.0.1:5000/api", // Or your Render URL
   headers: {
     "Content-Type": "application/json",
   },
@@ -15,27 +12,26 @@ const API = axios.create({
 /* ---------------- PLAN ---------------- */
 export const fetchPlan = () => API.get("/plan");
 export const seedDB = () => API.post("/seed");
-
 export const addExerciseToPlan = (day, exercise) =>
   API.post("/plan/add_exercise", { day, exercise });
-
 export const deleteExerciseFromPlan = (day, exerciseName) =>
   API.post("/plan/delete_exercise", { day, exerciseName });
 
 /* ---------------- FOODS ---------------- */
 export const fetchFoods = () => API.get("/foods");
+export const addFood = (foodData) => API.post("/foods", foodData);
+export const deleteFood = (id) => API.post("/foods/delete", { id });
 
-export const addFood = (foodData) =>
-  API.post("/foods", foodData);
-
-export const deleteFood = (id) =>
-  API.post("/foods/delete", { id });
-
-/* ---------------- DAILY LOG ---------------- */
+/* ---------------- DAILY LOG (FOOD & WORKOUTS) ---------------- */
 export const fetchDailyLog = () => API.get("/log");
 
-export const addToLog = (item) =>
-  API.post("/log", { item });
+// Food
+export const addToLog = (item) => API.post("/log/food", { item });
+export const deleteFromLog = (index) => API.post("/log/food/delete", { index });
 
-export const deleteFromLog = (index) =>
-  API.post("/log/delete", { index });
+// Exercises
+export const toggleExerciseLog = (exerciseName, dayLabel) => 
+  API.post("/log/exercise", { exerciseName, dayLabel });
+
+/* ---------------- HISTORY ---------------- */
+export const fetchHistory = () => API.get("/history");
