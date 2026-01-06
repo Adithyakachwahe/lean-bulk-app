@@ -12,58 +12,36 @@ from seed_data import initial_plan, initial_foods
 load_dotenv()
 app = Flask(__name__)
 
-# Allow CORS for your frontend
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
-# Database Setup
 mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/leanbulkdb")
 client = MongoClient(mongo_uri)
 db = client.leanbulkdb
-
-# =================================================================
-# ⚠️ DEV MODE: DROP EVERYTHING ON STARTUP
-# COMMENT OUT THE LINES BELOW WHEN YOU WANT TO KEEP DATA PERSISTENT
-# =================================================================
-# print("🔥 SYSTEM STARTUP: Dropping all collections for a clean slate...")
-# db.profile.drop()
-# db.foods.drop()
-# db.daily_logs.drop()
-# print("✅ DATABASE WIPED. It will re-seed on first request.")
-# =================================================================
-
 
 @app.route("/", methods=["GET"])
 def home():
     return "Backend is Live"
 
 # ------------------------
-# MANUAL SEED TRIGGER
+# SEED
 # ------------------------
 @app.route("/api/seed", methods=["POST"])
 def seed_database():
-    """Manually resets DB to seed_data.py"""
     db.profile.drop()
     db.foods.drop()
-    # db.daily_logs.drop() # Optional: decide if you want to wipe logs too
-    
     db.profile.insert_one(initial_plan)
     db.foods.insert_many(initial_foods)
-    
-    return jsonify({"message": "Database seeded with custom plan and foods"})
+    return jsonify({"message": "Database seeded"})
 
 # ------------------------
-# PLAN ROUTES
+# PLAN & PROFILE
 # ------------------------
 @app.route("/api/plan", methods=["GET"])
 def get_plan():
     plan = db.profile.find_one({}, {"_id": 0})
-    
-    # Auto-seed if database is empty (which it will be on restart now)
     if not plan:
-        print("🌱 Seeding Plan Data...")
         db.profile.insert_one(initial_plan)
         plan = db.profile.find_one({}, {"_id": 0})
-        
     return jsonify(plan)
 
 @app.route("/api/plan/add_exercise", methods=["POST"])
@@ -90,11 +68,8 @@ def delete_exercise():
 @app.route("/api/foods", methods=["GET", "POST"])
 def foods():
     if request.method == "GET":
-        # Auto-seed foods if empty
         if db.foods.count_documents({}) == 0:
-            print("🌱 Seeding Food Data...")
             db.foods.insert_many(initial_foods)
-
         foods = []
         for f in db.foods.find():
             f["_id"] = str(f["_id"])
@@ -114,24 +89,33 @@ def delete_food():
     return jsonify({"message": "Deleted"})
 
 # ------------------------
-# DAILY LOG
+# DAILY LOG (UPDATED)
 # ------------------------
 @app.route("/api/log", methods=["GET"])
 def get_daily_log():
     today = datetime.now().strftime("%Y-%m-%d")
     log = db.daily_logs.find_one({"date": today}, {"_id": 0})
     
+    # Default structure if no log exists for today
+    default_log = {
+        "date": today, 
+        "items": [], 
+        "completed_exercises": [], 
+        "total_calories": 0, 
+        "total_protein": 0,
+        "total_carbs": 0,
+        "total_fat": 0,
+        "water_ml": 0,
+        "body_weight": 0
+    }
+
     if not log:
-        return jsonify({
-            "date": today, 
-            "items": [], 
-            "completed_exercises": [], 
-            "total_calories": 0, 
-            "total_protein": 0
-        })
+        return jsonify(default_log)
     
-    if "completed_exercises" not in log:
-        log["completed_exercises"] = []
+    # Ensure new fields exist in old logs
+    for key in default_log:
+        if key not in log:
+            log[key] = default_log[key]
         
     return jsonify(log)
 
@@ -140,13 +124,20 @@ def log_food():
     today = datetime.now().strftime("%Y-%m-%d")
     item = request.json.get("item")
     
+    # Safe float conversion
+    def safe_num(val):
+        try: return float(val)
+        except: return 0.0
+
     db.daily_logs.update_one(
         {"date": today},
         {
             "$push": {"items": item},
             "$inc": {
-                "total_calories": int(item.get("calories", 0)),
-                "total_protein": float(item.get("protein", 0))
+                "total_calories": int(safe_num(item.get("calories"))),
+                "total_protein": safe_num(item.get("protein")),
+                "total_carbs": safe_num(item.get("carbs")), # NEW
+                "total_fat": safe_num(item.get("fat"))      # NEW
             }
         },
         upsert=True
@@ -164,6 +155,10 @@ def delete_log_food():
         
     item = log["items"][index]
     
+    def safe_num(val):
+        try: return float(val)
+        except: return 0.0
+    
     new_items = log["items"]
     new_items.pop(index)
     
@@ -172,12 +167,43 @@ def delete_log_food():
         {
             "$set": {"items": new_items},
             "$inc": {
-                "total_calories": -int(item.get("calories", 0)),
-                "total_protein": -float(item.get("protein", 0))
+                "total_calories": -int(safe_num(item.get("calories"))),
+                "total_protein": -safe_num(item.get("protein")),
+                "total_carbs": -safe_num(item.get("carbs")),
+                "total_fat": -safe_num(item.get("fat"))
             }
         }
     )
     return jsonify({"message": "Food Deleted"})
+
+@app.route("/api/log/water", methods=["POST"])
+def log_water():
+    today = datetime.now().strftime("%Y-%m-%d")
+    amount = request.json.get("amount") # +250 or -250
+    
+    db.daily_logs.update_one(
+        {"date": today},
+        {"$inc": {"water_ml": amount}},
+        upsert=True
+    )
+    return jsonify({"message": "Water Updated"})
+
+@app.route("/api/log/weight", methods=["POST"])
+def log_weight():
+    today = datetime.now().strftime("%Y-%m-%d")
+    weight = float(request.json.get("weight"))
+    
+    # Update Daily Log
+    db.daily_logs.update_one(
+        {"date": today},
+        {"$set": {"body_weight": weight}},
+        upsert=True
+    )
+    
+    # Update User Profile Current Weight
+    db.profile.update_one({}, {"$set": {"profile.currentWeight": weight}})
+    
+    return jsonify({"message": "Weight Updated"})
 
 @app.route("/api/log/exercise", methods=["POST"])
 def toggle_exercise():
@@ -222,7 +248,6 @@ def toggle_exercise():
 # ------------------------
 @app.route("/api/history", methods=["GET"])
 def get_history():
-    # Return last 30 days
     logs = list(db.daily_logs.find({}, {"_id": 0}).sort("date", -1).limit(30))
     return jsonify(logs)
 

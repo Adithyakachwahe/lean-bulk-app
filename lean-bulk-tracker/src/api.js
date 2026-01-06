@@ -1,8 +1,8 @@
 import axios from "axios";
 
-// CHANGE THIS TO YOUR ACTUAL BACKEND URL IF DIFFERENT
+// CHANGE THIS TO YOUR ACTUAL BACKEND URL
 const API = axios.create({
-  baseURL: "http://127.0.0.1:5000/api", // Or your Render URL
+  baseURL: "http://127.0.0.1:5000/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -22,12 +22,16 @@ export const fetchFoods = () => API.get("/foods");
 export const addFood = (foodData) => API.post("/foods", foodData);
 export const deleteFood = (id) => API.post("/foods/delete", { id });
 
-/* ---------------- DAILY LOG (FOOD & WORKOUTS) ---------------- */
+/* ---------------- DAILY LOG ---------------- */
 export const fetchDailyLog = () => API.get("/log");
 
 // Food
 export const addToLog = (item) => API.post("/log/food", { item });
 export const deleteFromLog = (index) => API.post("/log/food/delete", { index });
+
+// Water & Weight (NEW)
+export const updateWater = (amount) => API.post("/log/water", { amount });
+export const updateWeight = (weight) => API.post("/log/weight", { weight });
 
 // Exercises
 export const toggleExerciseLog = (exerciseName, dayLabel) => 
