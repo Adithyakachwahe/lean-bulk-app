@@ -24,11 +24,11 @@ db = client.leanbulkdb
 # ⚠️ DEV MODE: DROP EVERYTHING ON STARTUP
 # COMMENT OUT THE LINES BELOW WHEN YOU WANT TO KEEP DATA PERSISTENT
 # =================================================================
-print("🔥 SYSTEM STARTUP: Dropping all collections for a clean slate...")
-db.profile.drop()
-db.foods.drop()
-db.daily_logs.drop()
-print("✅ DATABASE WIPED. It will re-seed on first request.")
+# print("🔥 SYSTEM STARTUP: Dropping all collections for a clean slate...")
+# db.profile.drop()
+# db.foods.drop()
+# db.daily_logs.drop()
+# print("✅ DATABASE WIPED. It will re-seed on first request.")
 # =================================================================
 
 
