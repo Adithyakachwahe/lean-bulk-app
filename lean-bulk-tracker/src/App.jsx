@@ -13,6 +13,7 @@ import {
   CheckCircle,
   Clock,
   History,
+  X
 } from "lucide-react";
 import * as api from "./api";
 
@@ -169,7 +170,7 @@ const DashboardSection = ({ data, dailyLog }) => (
   </div>
 );
 
-// --- HISTORY SECTION (NEW) ---
+// --- HISTORY SECTION ---
 const HistorySection = () => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -258,7 +259,6 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
     const completedSet = new Set(dailyLog.completed_exercises?.map(e => e.name) || []);
 
     const handleToggleComplete = async (exName, dayLabel) => {
-      // Optimistic UI update could happen here, but we'll wait for server for safety
       await api.toggleExerciseLog(exName, dayLabel);
       onUpdateLog();
     };
@@ -353,18 +353,44 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
     );
 };
 
-// --- TRACKER ---
+// --- TRACKER (WITH QUANTITY SUPPORT) ---
 const TrackerSection = ({ dailyLog, onUpdate }) => {
     const [foods, setFoods] = useState([]);
     const [search, setSearch] = useState("");
+    
+    // Quantity Modal State
+    const [selectedFood, setSelectedFood] = useState(null);
+    const [quantity, setQuantity] = useState(1);
 
     useEffect(() => { 
         api.fetchFoods().then(res => setFoods(res.data)); 
     }, []);
 
-    const handleAdd = async (food) => {
-        await api.addToLog({ ...food, qty: 1 });
+    // 1. Open Modal when a food is clicked
+    const initiateAdd = (food) => {
+        setSelectedFood(food);
+        setQuantity(1);
+    };
+
+    // 2. Calculate and send to backend
+    const confirmAdd = async () => {
+        if (!selectedFood) return;
+
+        const totalCalories = Math.round(selectedFood.calories * quantity);
+        const totalProtein = Number((selectedFood.protein * quantity).toFixed(1));
+
+        const itemToAdd = {
+            ...selectedFood,
+            name: `${selectedFood.name} (x${quantity})`, 
+            calories: totalCalories,
+            protein: totalProtein,
+            qty: quantity
+        };
+
+        await api.addToLog(itemToAdd);
+        
         onUpdate();
+        setSelectedFood(null);
         setSearch("");
     };
 
@@ -376,7 +402,69 @@ const TrackerSection = ({ dailyLog, onUpdate }) => {
     const filteredFoods = foods.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
+            {/* QUANTITY POPUP MODAL */}
+            {selectedFood && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 w-full max-w-sm shadow-2xl relative">
+                        <button 
+                            onClick={() => setSelectedFood(null)} 
+                            className="absolute top-4 right-4 text-slate-500 hover:text-white"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <h3 className="text-xl font-bold text-white mb-1">{selectedFood.name}</h3>
+                        <p className="text-slate-400 text-sm mb-6">
+                            Base: {selectedFood.calories} cal • {selectedFood.protein}g P
+                        </p>
+
+                        <div className="mb-6">
+                            <label className="text-xs uppercase font-bold text-slate-500 mb-2 block">Quantity / Servings</label>
+                            <div className="flex items-center gap-4">
+                                <button 
+                                    onClick={() => setQuantity(q => Math.max(0.5, q - 0.5))}
+                                    className="w-12 h-12 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-xl font-bold text-white transition"
+                                >-</button>
+                                <input 
+                                    type="number" 
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(Number(e.target.value))}
+                                    className="flex-1 bg-slate-900 border border-slate-600 rounded-lg h-12 text-center text-lg font-bold text-emerald-400 focus:border-emerald-500 outline-none"
+                                />
+                                <button 
+                                    onClick={() => setQuantity(q => q + 0.5)}
+                                    className="w-12 h-12 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-xl font-bold text-white transition"
+                                >+</button>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/50 p-4 rounded-lg mb-6 flex justify-between items-center border border-slate-700/50">
+                            <div className="text-sm text-slate-400">Total to add:</div>
+                            <div className="text-right">
+                                <div className="text-white font-bold">{Math.round(selectedFood.calories * quantity)} kcal</div>
+                                <div className="text-emerald-400 text-xs font-mono">{(selectedFood.protein * quantity).toFixed(1)}g Protein</div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button 
+                                onClick={() => setSelectedFood(null)}
+                                className="py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmAdd}
+                                className="py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-900/20 transition"
+                            >
+                                Add Food
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Progress Bars */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 relative overflow-hidden">
@@ -406,7 +494,7 @@ const TrackerSection = ({ dailyLog, onUpdate }) => {
                 {search && (
                     <div className="absolute top-full left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-slate-800 rounded-lg border border-slate-600 shadow-xl z-30">
                         {filteredFoods.length > 0 ? filteredFoods.map((f, i) => (
-                            <button key={i} onClick={() => handleAdd(f)} className="w-full flex justify-between items-center p-3 hover:bg-slate-700 border-b border-slate-700/50 last:border-0 text-left text-sm group transition">
+                            <button key={i} onClick={() => initiateAdd(f)} className="w-full flex justify-between items-center p-3 hover:bg-slate-700 border-b border-slate-700/50 last:border-0 text-left text-sm group transition">
                                 <span className="font-medium text-slate-200">{f.name}</span>
                                 <div className="space-x-3 text-xs">
                                     <span className="text-emerald-400 font-mono">{f.protein}g P</span>

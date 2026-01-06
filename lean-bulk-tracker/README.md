@@ -22,5 +22,6 @@ git init
 git add .
 git commit -m "Ready for deploy"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/lean-bulk-app.git
+git remote add origin https://github.com/Adithyakachwahe/lean-bulk-app
+https://github.com/Adithyakachwahe/lean-bulk-app-tracker
 git push -u origin main
