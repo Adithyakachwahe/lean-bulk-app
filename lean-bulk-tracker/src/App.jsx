@@ -17,7 +17,7 @@ import {
   Droplets,
   Scale,
   Flame,
-  AlertCircle
+  Layers // Added Layers icon for the muscle group header
 } from "lucide-react";
 import * as api from "./api";
 
@@ -425,7 +425,6 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
                                          <span className="text-slate-500">{Number(item.fat || 0).toFixed(1)}g F</span>
                                      </div>
                                  </div>
-                                 {/* MODIFIED: Visible on mobile, hover on desktop */}
                                  <button onClick={() => handleDelete(idx)} className="text-slate-500 hover:text-red-400 p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                      <Trash2 size={18} />
                                  </button>
@@ -438,10 +437,11 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
     );
 };
 
-// --- TRAINING SECTION (UPDATED) ---
+// --- TRAINING SECTION (UPDATED FOR MUSCLE SPLIT) ---
 const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
     const [addingToDay, setAddingToDay] = useState(null);
-    const [newEx, setNewEx] = useState({ name: '', sets: 3, reps: '10-12', rest: '60s' });
+    // Added 'target' to state for grouping
+    const [newEx, setNewEx] = useState({ name: '', sets: 3, reps: '10-12', rest: '60s', target: '' });
     const completedSet = new Set(dailyLog.completed_exercises?.map(e => e.name) || []);
 
     const handleToggleComplete = async (exName, dayLabel) => {
@@ -451,23 +451,40 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
 
     const handleAdd = async (day) => {
         if(!newEx.name) return;
-        await api.addExerciseToPlan(day, newEx);
+        // Default target if empty
+        const exerciseData = { ...newEx, target: newEx.target || "General Workout" };
+        await api.addExerciseToPlan(day, exerciseData);
         setAddingToDay(null);
-        setNewEx({ name: '', sets: 3, reps: '10-12', rest: '60s' });
+        setNewEx({ name: '', sets: 3, reps: '10-12', rest: '60s', target: '' });
         onUpdatePlan();
     };
 
     const handleDelete = async (day, exName) => {
-        // Simple confirmation before deleting
         if(window.confirm(`Are you sure you want to remove "${exName}" from the ${day} workout?`)) {
             await api.deleteExerciseFromPlan(day, exName);
             onUpdatePlan();
         }
     };
 
+    // Helper to group exercises by target muscle
+    const groupExercises = (exercises) => {
+        return exercises.reduce((groups, ex) => {
+            const key = ex.target || "General Workout";
+            if (!groups[key]) {
+                groups[key] = [];
+            }
+            groups[key].push(ex);
+            return groups;
+        }, {});
+    };
+
     return (
         <div className="space-y-4">
-            {workouts && workouts.map((day, i) => (
+            {workouts && workouts.map((day, i) => {
+                const groupedExercises = groupExercises(day.exercises);
+                const sortedGroups = Object.keys(groupedExercises).sort(); // Optional sorting
+
+                return (
                 <div key={i} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm">
                     {/* Header */}
                     <div className="p-4 flex justify-between items-center bg-gradient-to-r from-slate-800 to-slate-800/50 border-b border-slate-700">
@@ -483,17 +500,25 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
                         </button>
                     </div>
 
-                    {/* Add Exercise Form (Responsive) */}
+                    {/* Add Exercise Form */}
                     {addingToDay === day.day && (
                         <div className="p-4 bg-slate-900 border-b border-slate-700 animate-in fade-in slide-in-from-top-2">
                             <h4 className="text-xs uppercase text-emerald-400 mb-3 font-bold">Add New Exercise</h4>
                             <div className="grid grid-cols-1 gap-3 mb-3">
-                                <input 
-                                    placeholder="Name (e.g. Bench Press)" 
-                                    className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none" 
-                                    value={newEx.name} 
-                                    onChange={e=>setNewEx({...newEx, name: e.target.value})} 
-                                />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input 
+                                        placeholder="Name (e.g. Bench Press)" 
+                                        className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none w-full" 
+                                        value={newEx.name} 
+                                        onChange={e=>setNewEx({...newEx, name: e.target.value})} 
+                                    />
+                                    <input 
+                                        placeholder="Target Muscle (e.g. Chest)" 
+                                        className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none w-full" 
+                                        value={newEx.target} 
+                                        onChange={e=>setNewEx({...newEx, target: e.target.value})} 
+                                    />
+                                </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     <input placeholder="Sets" type="number" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.sets} onChange={e=>setNewEx({...newEx, sets: e.target.value})} />
                                     <input placeholder="Reps" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.reps} onChange={e=>setNewEx({...newEx, reps: e.target.value})} />
@@ -504,42 +529,59 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
                         </div>
                     )}
 
-                    {/* Exercise List */}
+                    {/* Exercise List - Grouped */}
                     <div className="divide-y divide-slate-700/50">
-                        {day.exercises.map((ex, j) => {
-                            const isDone = completedSet.has(ex.name);
-                            return (
-                                <div key={j} className={`p-4 flex justify-between items-center transition-all duration-300 group ${isDone ? 'bg-emerald-900/10' : 'hover:bg-slate-700/20'}`}>
-                                    <div className="flex items-center gap-4 overflow-hidden">
-                                        <button onClick={() => handleToggleComplete(ex.name, day.day)} className={`flex-shrink-0 p-2 rounded-full border-2 transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-transparent hover:border-emerald-500'}`}>
-                                            <CheckCircle size={18} fill={isDone ? "currentColor" : "none"} />
-                                        </button>
-                                        <div className={`min-w-0 ${isDone ? "opacity-50" : "opacity-100"}`}>
-                                            <div className={`font-medium text-slate-200 truncate ${isDone ? 'line-through decoration-slate-500' : ''}`}>{ex.name}</div>
-                                            <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
-                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.sets} sets</span>
-                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.reps}</span>
-                                                <span className="flex items-center gap-1 whitespace-nowrap"><Clock size={10}/> {ex.rest}</span>
-                                            </div>
-                                        </div>
+                        {sortedGroups.map((groupName) => (
+                            <div key={groupName}>
+                                {/* Muscle Group Header */}
+                                {sortedGroups.length > 1 && (
+                                    <div className="bg-slate-900/40 px-4 py-2 flex items-center gap-2">
+                                        <Layers size={14} className="text-slate-500"/>
+                                        <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">{groupName}</span>
                                     </div>
-                                    
-                                    {/* DELETE BUTTON: Always visible on mobile (opacity-100), hidden on desktop until hover (md:opacity-0) */}
-                                    {!isDone && (
-                                        <button 
-                                            onClick={() => handleDelete(day.day, ex.name)} 
-                                            className="ml-2 text-slate-500 hover:text-red-400 p-2 md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity"
-                                            title="Remove Exercise"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                )}
+                                
+                                {/* Exercises in this group */}
+                                {groupedExercises[groupName].map((ex, j) => {
+                                    const isDone = completedSet.has(ex.name);
+                                    return (
+                                        <div key={j} className={`p-4 flex justify-between items-center transition-all duration-300 group ${isDone ? 'bg-emerald-900/10' : 'hover:bg-slate-700/20'}`}>
+                                            <div className="flex items-center gap-4 overflow-hidden">
+                                                <button onClick={() => handleToggleComplete(ex.name, day.day)} className={`flex-shrink-0 p-2 rounded-full border-2 transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-transparent hover:border-emerald-500'}`}>
+                                                    <CheckCircle size={18} fill={isDone ? "currentColor" : "none"} />
+                                                </button>
+                                                <div className={`min-w-0 ${isDone ? "opacity-50" : "opacity-100"}`}>
+                                                    <div className={`font-medium text-slate-200 truncate ${isDone ? 'line-through decoration-slate-500' : ''}`}>{ex.name}</div>
+                                                    <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                                                        <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.sets} sets</span>
+                                                        <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.reps}</span>
+                                                        <span className="flex items-center gap-1 whitespace-nowrap"><Clock size={10}/> {ex.rest}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {!isDone && (
+                                                <button 
+                                                    onClick={() => handleDelete(day.day, ex.name)} 
+                                                    className="ml-2 text-slate-500 hover:text-red-400 p-2 md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity"
+                                                    title="Remove Exercise"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                        {day.exercises.length === 0 && (
+                            <div className="p-8 text-center text-slate-500 text-sm italic">
+                                No exercises added yet.
+                            </div>
+                        )}
                     </div>
                 </div>
-            ))}
+            )})}
         </div>
     );
 };
