@@ -10,6 +10,7 @@ import {
   Database,
   Trash2,
   ChevronUp,
+  ChevronDown, // Added ChevronDown
   CheckCircle,
   Clock,
   History,
@@ -17,7 +18,7 @@ import {
   Droplets,
   Scale,
   Flame,
-  Layers // Added Layers icon for the muscle group header
+  Layers
 } from "lucide-react";
 import * as api from "./api";
 
@@ -437,12 +438,33 @@ const TrackerSection = ({ dailyLog, targetCals = 3000, onUpdate }) => {
     );
 };
 
-// --- TRAINING SECTION (UPDATED FOR MUSCLE SPLIT) ---
+// --- TRAINING SECTION (UPDATED FOR ACCORDION) ---
 const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
     const [addingToDay, setAddingToDay] = useState(null);
-    // Added 'target' to state for grouping
     const [newEx, setNewEx] = useState({ name: '', sets: 3, reps: '10-12', rest: '60s', target: '' });
+    // Initialize expandedDay to the current day of the week
+    const [expandedDay, setExpandedDay] = useState(null);
+
+    // Auto-expand current day on mount
+    useEffect(() => {
+        if (workouts) {
+            const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+            // Check if today exists in the workout list to default open it
+            const dayExists = workouts.find(w => w.day === todayName);
+            if(dayExists) {
+                setExpandedDay(todayName);
+            } else if (workouts.length > 0) {
+                // Optional: Expand first day if today isn't found
+                setExpandedDay(workouts[0].day);
+            }
+        }
+    }, [workouts]);
+
     const completedSet = new Set(dailyLog.completed_exercises?.map(e => e.name) || []);
+
+    const toggleDay = (dayName) => {
+        setExpandedDay(expandedDay === dayName ? null : dayName);
+    };
 
     const handleToggleComplete = async (exName, dayLabel) => {
       await api.toggleExerciseLog(exName, dayLabel);
@@ -451,7 +473,6 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
 
     const handleAdd = async (day) => {
         if(!newEx.name) return;
-        // Default target if empty
         const exerciseData = { ...newEx, target: newEx.target || "General Workout" };
         await api.addExerciseToPlan(day, exerciseData);
         setAddingToDay(null);
@@ -482,104 +503,123 @@ const TrainingSection = ({ workouts, dailyLog, onUpdatePlan, onUpdateLog }) => {
         <div className="space-y-4">
             {workouts && workouts.map((day, i) => {
                 const groupedExercises = groupExercises(day.exercises);
-                const sortedGroups = Object.keys(groupedExercises).sort(); // Optional sorting
+                const sortedGroups = Object.keys(groupedExercises).sort();
+                const isExpanded = expandedDay === day.day;
 
                 return (
                 <div key={i} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-sm">
-                    {/* Header */}
-                    <div className="p-4 flex justify-between items-center bg-gradient-to-r from-slate-800 to-slate-800/50 border-b border-slate-700">
+                    {/* Header - Click to toggle */}
+                    <div 
+                        className="p-4 flex justify-between items-center bg-gradient-to-r from-slate-800 to-slate-800/50 border-b border-slate-700 cursor-pointer hover:bg-slate-700/30 transition-colors"
+                        onClick={() => toggleDay(day.day)}
+                    >
                         <div>
-                            <h3 className="text-blue-400 font-bold text-lg">{day.day}</h3>
+                            <h3 className={`font-bold text-lg ${isExpanded ? 'text-blue-400' : 'text-slate-400'}`}>{day.day}</h3>
                             <p className="text-xs text-slate-400 uppercase tracking-wide">{day.title}</p>
                         </div>
-                        <button 
-                            onClick={() => setAddingToDay(addingToDay === day.day ? null : day.day)} 
-                            className="bg-slate-700 p-2 rounded-full hover:bg-slate-600 transition"
-                        >
-                            {addingToDay === day.day ? <ChevronUp size={20}/> : <PlusCircle size={20}/>}
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent toggling accordion when clicking add
+                                    setAddingToDay(addingToDay === day.day ? null : day.day);
+                                    setExpandedDay(day.day); // Ensure day is open when adding
+                                }} 
+                                className="bg-slate-700 p-2 rounded-full hover:bg-slate-600 transition text-slate-300 hover:text-white"
+                                title="Add Exercise"
+                            >
+                                <PlusCircle size={20}/>
+                            </button>
+                            <div className="text-slate-500">
+                                {isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Add Exercise Form */}
-                    {addingToDay === day.day && (
-                        <div className="p-4 bg-slate-900 border-b border-slate-700 animate-in fade-in slide-in-from-top-2">
-                            <h4 className="text-xs uppercase text-emerald-400 mb-3 font-bold">Add New Exercise</h4>
-                            <div className="grid grid-cols-1 gap-3 mb-3">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input 
-                                        placeholder="Name (e.g. Bench Press)" 
-                                        className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none w-full" 
-                                        value={newEx.name} 
-                                        onChange={e=>setNewEx({...newEx, name: e.target.value})} 
-                                    />
-                                    <input 
-                                        placeholder="Target Muscle (e.g. Chest)" 
-                                        className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none w-full" 
-                                        value={newEx.target} 
-                                        onChange={e=>setNewEx({...newEx, target: e.target.value})} 
-                                    />
+                    {/* Content - Only visible if expanded */}
+                    {isExpanded && (
+                        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                            {/* Add Exercise Form */}
+                            {addingToDay === day.day && (
+                                <div className="p-4 bg-slate-900 border-b border-slate-700">
+                                    <h4 className="text-xs uppercase text-emerald-400 mb-3 font-bold">Add New Exercise</h4>
+                                    <div className="grid grid-cols-1 gap-3 mb-3">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input 
+                                                placeholder="Name (e.g. Bench Press)" 
+                                                className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none w-full" 
+                                                value={newEx.name} 
+                                                onChange={e=>setNewEx({...newEx, name: e.target.value})} 
+                                            />
+                                            <input 
+                                                placeholder="Target Muscle (e.g. Chest)" 
+                                                className="bg-slate-800 p-3 rounded text-sm text-white border border-slate-700 focus:border-emerald-500 outline-none w-full" 
+                                                value={newEx.target} 
+                                                onChange={e=>setNewEx({...newEx, target: e.target.value})} 
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <input placeholder="Sets" type="number" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.sets} onChange={e=>setNewEx({...newEx, sets: e.target.value})} />
+                                            <input placeholder="Reps" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.reps} onChange={e=>setNewEx({...newEx, reps: e.target.value})} />
+                                            <input placeholder="Rest" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.rest} onChange={e=>setNewEx({...newEx, rest: e.target.value})} />
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleAdd(day.day)} className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg text-sm font-bold transition">Add to Workout</button>
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                    <input placeholder="Sets" type="number" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.sets} onChange={e=>setNewEx({...newEx, sets: e.target.value})} />
-                                    <input placeholder="Reps" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.reps} onChange={e=>setNewEx({...newEx, reps: e.target.value})} />
-                                    <input placeholder="Rest" className="bg-slate-800 p-2 rounded text-sm border border-slate-700 outline-none text-center" value={newEx.rest} onChange={e=>setNewEx({...newEx, rest: e.target.value})} />
-                                </div>
-                            </div>
-                            <button onClick={() => handleAdd(day.day)} className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg text-sm font-bold transition">Add to Workout</button>
-                        </div>
-                    )}
+                            )}
 
-                    {/* Exercise List - Grouped */}
-                    <div className="divide-y divide-slate-700/50">
-                        {sortedGroups.map((groupName) => (
-                            <div key={groupName}>
-                                {/* Muscle Group Header */}
-                                {sortedGroups.length > 1 && (
-                                    <div className="bg-slate-900/40 px-4 py-2 flex items-center gap-2">
-                                        <Layers size={14} className="text-slate-500"/>
-                                        <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">{groupName}</span>
+                            {/* Exercise List - Grouped */}
+                            <div className="divide-y divide-slate-700/50">
+                                {sortedGroups.map((groupName) => (
+                                    <div key={groupName}>
+                                        {/* Muscle Group Header */}
+                                        {sortedGroups.length > 1 && (
+                                            <div className="bg-slate-900/40 px-4 py-2 flex items-center gap-2">
+                                                <Layers size={14} className="text-slate-500"/>
+                                                <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">{groupName}</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Exercises in this group */}
+                                        {groupedExercises[groupName].map((ex, j) => {
+                                            const isDone = completedSet.has(ex.name);
+                                            return (
+                                                <div key={j} className={`p-4 flex justify-between items-center transition-all duration-300 group ${isDone ? 'bg-emerald-900/10' : 'hover:bg-slate-700/20'}`}>
+                                                    <div className="flex items-center gap-4 overflow-hidden">
+                                                        <button onClick={() => handleToggleComplete(ex.name, day.day)} className={`flex-shrink-0 p-2 rounded-full border-2 transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-transparent hover:border-emerald-500'}`}>
+                                                            <CheckCircle size={18} fill={isDone ? "currentColor" : "none"} />
+                                                        </button>
+                                                        <div className={`min-w-0 ${isDone ? "opacity-50" : "opacity-100"}`}>
+                                                            <div className={`font-medium text-slate-200 truncate ${isDone ? 'line-through decoration-slate-500' : ''}`}>{ex.name}</div>
+                                                            <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+                                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.sets} sets</span>
+                                                                <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.reps}</span>
+                                                                <span className="flex items-center gap-1 whitespace-nowrap"><Clock size={10}/> {ex.rest}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {!isDone && (
+                                                        <button 
+                                                            onClick={() => handleDelete(day.day, ex.name)} 
+                                                            className="ml-2 text-slate-500 hover:text-red-400 p-2 md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity"
+                                                            title="Remove Exercise"
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+                                {day.exercises.length === 0 && (
+                                    <div className="p-8 text-center text-slate-500 text-sm italic">
+                                        No exercises added yet.
                                     </div>
                                 )}
-                                
-                                {/* Exercises in this group */}
-                                {groupedExercises[groupName].map((ex, j) => {
-                                    const isDone = completedSet.has(ex.name);
-                                    return (
-                                        <div key={j} className={`p-4 flex justify-between items-center transition-all duration-300 group ${isDone ? 'bg-emerald-900/10' : 'hover:bg-slate-700/20'}`}>
-                                            <div className="flex items-center gap-4 overflow-hidden">
-                                                <button onClick={() => handleToggleComplete(ex.name, day.day)} className={`flex-shrink-0 p-2 rounded-full border-2 transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-transparent hover:border-emerald-500'}`}>
-                                                    <CheckCircle size={18} fill={isDone ? "currentColor" : "none"} />
-                                                </button>
-                                                <div className={`min-w-0 ${isDone ? "opacity-50" : "opacity-100"}`}>
-                                                    <div className={`font-medium text-slate-200 truncate ${isDone ? 'line-through decoration-slate-500' : ''}`}>{ex.name}</div>
-                                                    <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
-                                                        <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.sets} sets</span>
-                                                        <span className="bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 whitespace-nowrap">{ex.reps}</span>
-                                                        <span className="flex items-center gap-1 whitespace-nowrap"><Clock size={10}/> {ex.rest}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            {!isDone && (
-                                                <button 
-                                                    onClick={() => handleDelete(day.day, ex.name)} 
-                                                    className="ml-2 text-slate-500 hover:text-red-400 p-2 md:opacity-0 md:group-hover:opacity-100 opacity-100 transition-opacity"
-                                                    title="Remove Exercise"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
                             </div>
-                        ))}
-                        {day.exercises.length === 0 && (
-                            <div className="p-8 text-center text-slate-500 text-sm italic">
-                                No exercises added yet.
-                            </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             )})}
         </div>
