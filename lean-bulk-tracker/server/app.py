@@ -89,7 +89,7 @@ def delete_food():
     return jsonify({"message": "Deleted"})
 
 # ------------------------
-# DAILY LOG (UPDATED)
+# DAILY LOG
 # ------------------------
 @app.route("/api/log", methods=["GET"])
 def get_daily_log():
@@ -136,8 +136,8 @@ def log_food():
             "$inc": {
                 "total_calories": int(safe_num(item.get("calories"))),
                 "total_protein": safe_num(item.get("protein")),
-                "total_carbs": safe_num(item.get("carbs")), # NEW
-                "total_fat": safe_num(item.get("fat"))      # NEW
+                "total_carbs": safe_num(item.get("carbs")),
+                "total_fat": safe_num(item.get("fat"))
             }
         },
         upsert=True
@@ -211,7 +211,13 @@ def toggle_exercise():
     data = request.json
     ex_name = data.get("exerciseName")
     day_label = data.get("dayLabel") 
+    weight = data.get("weight", 0) # NEW: Get weight
     
+    try:
+        weight = float(weight)
+    except:
+        weight = 0
+
     log = db.daily_logs.find_one({"date": today})
     
     exists = False
@@ -220,21 +226,26 @@ def toggle_exercise():
             if ex["name"] == ex_name:
                 exists = True
                 break
-                
+    
+    # Logic: Always remove the existing entry for this exercise to prevent duplicates
+    db.daily_logs.update_one(
+        {"date": today},
+        {"$pull": {"completed_exercises": {"name": ex_name}}}
+    )
+
     if exists:
-        db.daily_logs.update_one(
-            {"date": today},
-            {"$pull": {"completed_exercises": {"name": ex_name}}}
-        )
+        # If it existed, we just removed it. So we are done (Toggled OFF).
         return jsonify({"status": "removed"})
     else:
+        # If it didn't exist, we add it with the weight (Toggled ON).
         db.daily_logs.update_one(
             {"date": today},
             {
-                "$addToSet": {
+                "$push": {
                     "completed_exercises": {
                         "name": ex_name,
                         "day": day_label,
+                        "weight": weight, # Store the lifted weight
                         "timestamp": datetime.now().isoformat()
                     }
                 }
